@@ -189,34 +189,6 @@ class AllocationProblem(Assembly):
 if __name__ == '__main__':
     from subprocess import call
 
-    def setup_opt(seg):
-        asm = set_as_top(Assembly())
-
-        from openmdao.main.test.simpledriver import SimpleDriver
-        # asm.add('driver', SimpleDriver())
-        asm.add('driver', pyOptSparseDriver())
-        asm.driver.optimizer = 'SNOPT'
-        asm.driver.options = {'Iterations limit': 5000000}#, 'Verify level':3}
-        asm.driver.gradient_options.lin_solver = "linear_gs"
-        asm.driver.gradient_options.maxiter = 1
-        asm.driver.gradient_options.derivative_direction = 'adjoint'
-        asm.driver.gradient_options.iprint = 0
-        asm.driver.gradient_options.rtol = 1e-20
-        asm.driver.gradient_options.atol = 1e-20
-        asm.driver.system_type = 'serial'
-
-        asm.add('segment', seg)
-        asm.driver.add_objective('segment.fuelburn')
-        asm.driver.add_parameter('segment.h_pt', low=0.0, high=14.1)
-        asm.driver.add_constraint('segment.h[0] = 0.0', linear=True)
-        asm.driver.add_constraint('segment.h[-1] = 0.0', linear=True)
-        asm.driver.add_constraint('segment.Tmin < 0.0')
-        asm.driver.add_constraint('segment.Tmax < 0.0')
-        asm.driver.add_constraint('%.15f < segment.Gamma < %.15f' % \
-                                  (alloc.gamma_lb,alloc.gamma_ub), linear=True)
-
-        return asm
-
     def var_dump(asmb, indent=0):
         spaces = indent * " "
         print spaces + "asmb.name"
@@ -242,11 +214,33 @@ if __name__ == '__main__':
         for inac in xrange(alloc.num_new_ac):
             seg_name = 'Seg_%03i_%03i' % (irt,inac)
             seg = alloc.get(seg_name)
-            sub_opt = setup_opt(seg)
+
+            seg.replace('driver', pyOptSparseDriver())
+            seg.driver.optimizer = 'SNOPT'
+            seg.driver.options = {'Iterations limit': 5000000}#, 'Verify level':3}
+            seg.driver.gradient_options.lin_solver = "linear_gs"
+            seg.driver.gradient_options.maxiter = 1
+            #seg.driver.gradient_options.derivative_direction = 'adjoint'
+            seg.driver.gradient_options.iprint = 0
+            seg.driver.gradient_options.rtol = 1e-20
+            seg.driver.gradient_options.atol = 1e-20
+            seg.driver.system_type = 'serial'
+
+            #seg.add('segment', seg)
+            seg.driver.add_objective('fuelburn')
+            seg.driver.add_parameter('h_pt', low=0.0, high=14.1)
+            seg.driver.add_constraint('h[0] = 0.0', linear=True)
+            seg.driver.add_constraint('h[-1] = 0.0', linear=True)
+            seg.driver.add_constraint('Tmin < 0.0')
+            seg.driver.add_constraint('Tmax < 0.0')
+            seg.driver.add_constraint('%.15f < Gamma < %.15f' % \
+                                      (alloc.gamma_lb,alloc.gamma_ub), linear=True)
+
+            seg._setup()
+            seg.run()
 
             #twiddle = np.random.random(sub_opt.segment.h_pt.shape)*.2 + 1
             #sub_opt.segment.h_pt*=twiddle
-            sub_opt.run()
             #sub_opt.driver.check_gradient(inputs=('segment.h_pt', ), outputs=('segment.Tmax',), fd_form="central", fd_step_type="absolute")
             #exit()
 
